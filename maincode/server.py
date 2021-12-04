@@ -1,7 +1,10 @@
-import os, time, threading
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+import os, time, threading, random
 from werkzeug.utils import secure_filename
 from flask import Flask, request, redirect, url_for
 from displayservice import refreshDisplay
+from weather import refreshWeather
 from PIL import Image
 import qrcode
 from qrcode.image.pure import PymagingImage
@@ -12,11 +15,20 @@ app = Flask(__name__)
 ALLOWED_EXTENSIONS = set(['png', 'jpg', 'jpeg', 'gif', 'bmp', ''])
 UPLOAD_FOLDER = './../pic'
 PIC_PATH = "/home/pi/eInkPictureService/pic/"
-
+WEATHER_PATH = "/home/pi/eInkPictureService/maincode/"
+SLIDESHOW_PATH = "/home/pi/eInkPictureService/slideshow_images/"
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def prepareImagefromPath(filepath):
+	rawImage = Image.open(filepath)
+	rawImage = rawImage.convert('L')
+	rawImage = rawImage.resize((640,384), Image.ANTIALIAS)
+	rawImage.save(PIC_PATH + "temp.bmp")
+	display_thread = threading.Thread(target=async_refresh_display, name="Display_Refresh")
+	display_thread.start()
 
 @app.route('/healthcheck', methods=['GET'])
 def healthcheck():
@@ -26,6 +38,17 @@ def healthcheck():
 def refreshCalendar():
 	print 'refreshing Calendar'
 	return 'refreshing Calendar'
+
+@app.route('/slideshow', methods=['GET'])
+def slideshow():
+	prepareImagefromPath(SLIDESHOW_PATH + random.choice(os.listdir(SLIDESHOW_PATH)))
+	return "slideshow loading"
+
+@app.route('/weather', methods=['GET'])
+def showWeatherScreen():
+	refreshWeather()
+	prepareImagefromPath(WEATHER_PATH + 'weather.png')
+	return 'generating and weather info screen'
 
 @app.route('/qrcode', methods=['POST'])
 def generate_and_show_qr():
